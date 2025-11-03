@@ -1,61 +1,11 @@
-// Provides functions, structures, and enums
-// Using the #define allows GLFW to include its own definitions
-// and automatically load the Vulkan header with it
-#define GLFW_INCLUDE_VULKAN
-// Make sure our rotations are based in radians
-#define GLM_FORCE_RADIANS
-// Make the perspective projection matrix use 0.0 - 1.0 range for depth
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-// Alignment for shaders
-#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
-// For image loading
-#define STB_IMAGE_IMPLEMENTATION
-// For model loading
-#define TINYOBJLOADER_IMPLEMENTATION
-// For hashing vertices
-#define GLM_ENABLE_EXPERIMENTAL
-
-#include <GLFW/glfw3.h>
-// GLM for linear algebra stuff
-#include <glm/glm.hpp>
-// Included for reporting and propagating errors
-#include <iostream>
-#include <stdexcept>
-// Provides EXIT_SUCCESS and EXIT_FAILURE macros
-#include <cstdlib>
-// Vector library
-#include <vector>
-// Used for determining if a value exists or not
-#include <optional>
-// For unique queue families
-#include <set>
-// For numeric limits
-#include <limits>
-// For clamp
-#include <algorithm>
-// For reading shader files (SPIR V)
-#include <fstream>
-// For vertex buffer stuff
-#include <array>
-// For matrix transformations
-#include <glm/gtc/matrix_transform.hpp>
-// For timekeeping
-#include <chrono>
-// For image loading
-#include <stb_image.h>
-// For model loading
-#include <tiny_obj_loader.h>
-// For keeping track of unique vertices to deduplicate vertices
-#include <unordered_map>
-// For vertex hashing for the unordered map
-#include <glm/gtx/hash.hpp>
+#include "Engine.h"
 
 // Constants for window size
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
 // Hardcoded model and texture
-const std::string MODEL_PATH = "Models/viking_room.obj";
+const std::string MODEL_PATH = "Models/viking_room.gltf";
 const std::string TEXTURE_PATH = "Textures/viking_room.png";
 
 // Constants for validation layers
@@ -77,75 +27,77 @@ const int MAX_FRAMES_IN_FLIGHT = 2;
     const bool enableValidationLayers = true;
 #endif
 
-// Struct for queue families.
-// Most Vulkan operations are submitted to queues, so these are big
-struct QueueFamilyIndices {
-    // The optional data structure can be queried with has_value() to see if there's
-    // anything in it, as opposed to relying on a magic number comparison.
-    std::optional<uint32_t> graphicsFamily;
-    // Family that supports presentation (could be different from graphics)
-    std::optional<uint32_t> presentFamily;
-    // Check if we have our graphics family AND presentation family ready
-    bool isComplete() {
-        return graphicsFamily.has_value() && presentFamily.has_value();
-    }
-};
 
-// Struct for details of a device's swapchain and which features it supports
-struct SwapChainSupportDetails {
-    VkSurfaceCapabilitiesKHR capabilities;
-    std::vector<VkSurfaceFormatKHR> formats;
-    std::vector<VkPresentModeKHR> presentModes;
-};
+    // Struct for queue families.
+    // Most Vulkan operations are submitted to queues, so these are big
+    struct QueueFamilyIndices {
+        // The optional data structure can be queried with has_value() to see if there's
+        // anything in it, as opposed to relying on a magic number comparison.
+        std::optional<uint32_t> graphicsFamily;
+        // Family that supports presentation (could be different from graphics)
+        std::optional<uint32_t> presentFamily;
+        // Check if we have our graphics family AND presentation family ready
+        bool isComplete() {
+            return graphicsFamily.has_value() && presentFamily.has_value();
+        }
+    };
 
-// Vertex struct for shader stuff
-struct Vertex {
-    // Position and color
-    glm::vec3 pos;
-    glm::vec3 color;
-    // Texture coordinates
-    glm::vec2 texCoord;
-    // How to pass data to vertex shader
-    static VkVertexInputBindingDescription getBindingDescription() {
-        // Described at which rate to load data from memory throughout the verts
-        VkVertexInputBindingDescription bindingDescription{};
-        bindingDescription.binding = 0;
-        bindingDescription.stride = sizeof(Vertex);
-        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-        return bindingDescription;
-    }
-    // Get attribute descriptions
-    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
-        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
-        // Position attr
-        attributeDescriptions[0].binding = 0;
-        attributeDescriptions[0].location = 0;
-        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[0].offset = offsetof(Vertex, pos);
-        // Color attr
-        attributeDescriptions[1].binding = 0;
-        attributeDescriptions[1].location = 1;
-        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[1].offset = offsetof(Vertex, color);
-        // Texture coord attribute
-        attributeDescriptions[2].binding = 0;
-        attributeDescriptions[2].location = 2;
-        attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-        attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
-        return attributeDescriptions;
-    }
-    // Overwrite == to use unordered_map in our uniqueVertices
-    bool operator==(const Vertex& other) const {
-        return pos == other.pos && color == other.color && texCoord == other.texCoord;
-    }
-};
+    // Struct for details of a device's swapchain and which features it supports
+    struct SwapChainSupportDetails {
+        VkSurfaceCapabilitiesKHR capabilities;
+        std::vector<VkSurfaceFormatKHR> formats;
+        std::vector<VkPresentModeKHR> presentModes;
+    };
 
-// UBO struct
-struct UniformBufferObject {
-    glm::mat4 model;
-    glm::mat4 view;
-    glm::mat4 proj;
-};
+
+    // Vertex struct for shader stuff
+    struct Vertex {
+        // Position and color
+        glm::vec3 pos;
+        glm::vec3 color;
+        // Texture coordinates
+        glm::vec2 texCoord;
+        // How to pass data to vertex shader
+        static VkVertexInputBindingDescription getBindingDescription() {
+            // Described at which rate to load data from memory throughout the verts
+            VkVertexInputBindingDescription bindingDescription{};
+            bindingDescription.binding = 0;
+            bindingDescription.stride = sizeof(Vertex);
+            bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+            return bindingDescription;
+        }
+        // Get attribute descriptions
+        static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
+            std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
+            // Position attr
+            attributeDescriptions[0].binding = 0;
+            attributeDescriptions[0].location = 0;
+            attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+            attributeDescriptions[0].offset = offsetof(Vertex, pos);
+            // Color attr
+            attributeDescriptions[1].binding = 0;
+            attributeDescriptions[1].location = 1;
+            attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+            attributeDescriptions[1].offset = offsetof(Vertex, color);
+            // Texture coord attribute
+            attributeDescriptions[2].binding = 0;
+            attributeDescriptions[2].location = 2;
+            attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+            attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
+            return attributeDescriptions;
+        }
+        // Overwrite == to use unordered_map in our uniqueVertices
+        bool operator==(const Vertex& other) const {
+            return pos == other.pos && color == other.color && texCoord == other.texCoord;
+        }
+    };
+
+    // UBO struct
+    struct UniformBufferObject {
+        glm::mat4 model;
+        glm::mat4 view;
+        glm::mat4 proj;
+    };
 
 // CUstom hash function for Vertex
 namespace std {
@@ -526,40 +478,114 @@ private:
 
     // For populating vertices and indices for models
     void loadModel() {
-        tinyobj::attrib_t attrib;
-        std::vector<tinyobj::shape_t> shapes;
-        std::vector<tinyobj::material_t> materials;
-        std::string warn, err;
-        // Automatically triangulates vertices for us
-        if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str())) {
-            throw std::runtime_error(err);
+        // Use tinygltf to load the model instead of tinyobjloader
+        tinygltf::Model model;
+        tinygltf::TinyGLTF loader;
+        std::string err;
+        std::string warn;
+
+        //bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, MODEL_PATH);
+        bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, MODEL_PATH);
+
+        if (!warn.empty()) {
+            std::cout << "glTF warning: " << warn << std::endl;
         }
-        // Keep track of vertices to not reuse
-        std::unordered_map<Vertex, uint32_t> uniqueVertices{};
 
-        for (const auto& shape : shapes) {
-            for (const auto& index : shape.mesh.indices) {
-                Vertex vertex{};
-                // Vertices array is a float array, not glm::vec3, so you gotta multiply by 3
-                vertex.pos = {
-                    attrib.vertices[3 * index.vertex_index + 0],
-                    attrib.vertices[3 * index.vertex_index + 1],
-                    attrib.vertices[3 * index.vertex_index + 2]
-                };
-                // Same as above but 2 for textures
-                // We flip the vertical component because OBJ assumes 0 is the bottom, but the image format has 0 at the top
-                vertex.texCoord = {
-                    attrib.texcoords[2 * index.texcoord_index + 0],
-                    1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-                };
+        if (!err.empty()) {
+            std::cout << "glTF error: " << err << std::endl;
+        }
 
-                vertex.color = { 1.0f, 1.0f, 1.0f };
+        if (!ret) {
+            throw std::runtime_error("Failed to load glTF model");
+        }
 
-                if (uniqueVertices.count(vertex) == 0) {
-                    uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+        vertices.clear();
+        indices.clear();
+
+        // Process all meshes in the model
+        for (const auto& mesh : model.meshes) {
+            for (const auto& primitive : mesh.primitives) {
+                // Get indices
+                const tinygltf::Accessor& indexAccessor = model.accessors[primitive.indices];
+                const tinygltf::BufferView& indexBufferView = model.bufferViews[indexAccessor.bufferView];
+                const tinygltf::Buffer& indexBuffer = model.buffers[indexBufferView.buffer];
+
+                // Get vertex positions
+                const tinygltf::Accessor& posAccessor = model.accessors[primitive.attributes.at("POSITION")];
+                const tinygltf::BufferView& posBufferView = model.bufferViews[posAccessor.bufferView];
+                const tinygltf::Buffer& posBuffer = model.buffers[posBufferView.buffer];
+
+                // Get texture coordinates if available
+                bool hasTexCoords = primitive.attributes.find("TEXCOORD_0") != primitive.attributes.end();
+                const tinygltf::Accessor* texCoordAccessor = nullptr;
+                const tinygltf::BufferView* texCoordBufferView = nullptr;
+                const tinygltf::Buffer* texCoordBuffer = nullptr;
+
+                if (hasTexCoords) {
+                    texCoordAccessor = &model.accessors[primitive.attributes.at("TEXCOORD_0")];
+                    texCoordBufferView = &model.bufferViews[texCoordAccessor->bufferView];
+                    texCoordBuffer = &model.buffers[texCoordBufferView->buffer];
+                }
+
+                uint32_t baseVertex = static_cast<uint32_t>(vertices.size());
+
+                for (size_t i = 0; i < posAccessor.count; i++) {
+                    Vertex vertex{};
+
+                    const float* pos = reinterpret_cast<const float*>(&posBuffer.data[posBufferView.byteOffset + posAccessor.byteOffset + i * 12]);
+                    // glTF uses a right-handed coordinate system with Y-up
+                    // Vulkan uses a right-handed coordinate system with Y-down
+                    // We need to flip the Y coordinate
+                    vertex.pos = { pos[0], -pos[1], pos[2] };
+
+                    if (hasTexCoords) {
+                        const float* texCoord = reinterpret_cast<const float*>(&texCoordBuffer->data[texCoordBufferView->byteOffset + texCoordAccessor->byteOffset + i * 8]);
+                        vertex.texCoord = { texCoord[0], texCoord[1] };
+                    }
+                    else {
+                        vertex.texCoord = { 0.0f, 0.0f };
+                    }
+
+                    vertex.color = { 1.0f, 1.0f, 1.0f };
+
                     vertices.push_back(vertex);
                 }
-                indices.push_back(uniqueVertices[vertex]);
+
+                const unsigned char* indexData = &indexBuffer.data[indexBufferView.byteOffset + indexAccessor.byteOffset];
+                size_t indexCount = indexAccessor.count;
+                size_t indexStride = 0;
+
+                // Determine index stride based on component type
+                if (indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+                    indexStride = sizeof(uint16_t);
+                }
+                else if (indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
+                    indexStride = sizeof(uint32_t);
+                }
+                else if (indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+                    indexStride = sizeof(uint8_t);
+                }
+                else {
+                    throw std::runtime_error("Unsupported index component type");
+                }
+
+                indices.reserve(indices.size() + indexCount);
+
+                for (size_t i = 0; i < indexCount; i++) {
+                    uint32_t index = 0;
+
+                    if (indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+                        index = *reinterpret_cast<const uint16_t*>(indexData + i * indexStride);
+                    }
+                    else if (indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
+                        index = *reinterpret_cast<const uint32_t*>(indexData + i * indexStride);
+                    }
+                    else if (indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+                        index = *reinterpret_cast<const uint8_t*>(indexData + i * indexStride);
+                    }
+
+                    indices.push_back(baseVertex + index);
+                }
             }
         }
     }
@@ -1436,7 +1462,8 @@ private:
         rasterizer.lineWidth = 1.0f;
         // Culling options
         rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-        rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        // Clockwise for GLTF, counter clockwise for OBJ
+        rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
         // Depth options
         rasterizer.depthBiasEnable = VK_FALSE;
         rasterizer.depthBiasConstantFactor = 0.0f;
