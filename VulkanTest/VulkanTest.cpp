@@ -8,6 +8,9 @@ const uint32_t HEIGHT = 600;
 const std::string MODEL_PATH = "Models/viking_room.gltf";
 const std::string TEXTURE_PATH = "Textures/viking_room.png";
 
+//const std::string MODEL_PATH = "Models/BarramundiFish/BarramundiFish.gltf";
+//const std::string TEXTURE_PATH = "Textures/BarramundiFish_baseColor.png";
+
 // Constants for validation layers
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
