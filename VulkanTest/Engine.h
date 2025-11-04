@@ -55,3 +55,7 @@
 
 // For GameObjects
 #include "GameObject.h"
+// Camera
+#include "Camera.h"
+// Light
+#include "Light.h"

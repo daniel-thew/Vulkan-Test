@@ -60,6 +60,8 @@ const int MAX_FRAMES_IN_FLIGHT = 2;
         glm::vec3 color;
         // Texture coordinates
         glm::vec2 texCoord;
+        // Normal
+        glm::vec3 normal;
         // How to pass data to vertex shader
         static VkVertexInputBindingDescription getBindingDescription() {
             // Described at which rate to load data from memory throughout the verts
@@ -70,8 +72,8 @@ const int MAX_FRAMES_IN_FLIGHT = 2;
             return bindingDescription;
         }
         // Get attribute descriptions
-        static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
-            std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
+        static std::array<VkVertexInputAttributeDescription, 4> getAttributeDescriptions() {
+            std::array<VkVertexInputAttributeDescription, 4> attributeDescriptions{};
             // Position attr
             attributeDescriptions[0].binding = 0;
             attributeDescriptions[0].location = 0;
@@ -87,6 +89,11 @@ const int MAX_FRAMES_IN_FLIGHT = 2;
             attributeDescriptions[2].location = 2;
             attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
             attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
+            // Normal attribute
+            attributeDescriptions[3].binding = 0;
+            attributeDescriptions[3].location = 3;
+            attributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
+            attributeDescriptions[3].offset = offsetof(Vertex, normal);
             return attributeDescriptions;
         }
         // Overwrite == to use unordered_map in our uniqueVertices
@@ -100,6 +107,7 @@ const int MAX_FRAMES_IN_FLIGHT = 2;
         glm::mat4 model;
         glm::mat4 view;
         glm::mat4 proj;
+        glm::vec4 light;
     };
 
 // CUstom hash function for Vertex
@@ -278,6 +286,13 @@ private:
     VkImage depthImage;
     VkDeviceMemory depthImageMemory;
     VkImageView depthImageView;
+
+    // Global light
+    glm::vec4 lightPos = glm::vec4(40.0f, 20.0f, 5.0f, 0.0f);
+    float lightFOV = 45.0f;
+    Light light = Light(lightPos, lightFOV);
+    // Camera
+    Camera camera = Camera();
 
     // Initialize the window
     void initWindow() {
@@ -518,6 +533,18 @@ private:
                 const tinygltf::BufferView& posBufferView = model.bufferViews[posAccessor.bufferView];
                 const tinygltf::Buffer& posBuffer = model.buffers[posBufferView.buffer];
 
+                // Get normals if available
+                bool hasNormals = primitive.attributes.find("NORMAL") != primitive.attributes.end();
+                const tinygltf::Accessor* normalAccessor = nullptr;
+                const tinygltf::BufferView* normalBufferView = nullptr;
+                const tinygltf::Buffer* normalBuffer = nullptr;
+
+                if (hasNormals) {
+                    normalAccessor = &model.accessors[primitive.attributes.at("NORMAL")];
+                    normalBufferView = &model.bufferViews[normalAccessor->bufferView];
+                    normalBuffer = &model.buffers[normalBufferView->buffer];
+                }
+
                 // Get texture coordinates if available
                 bool hasTexCoords = primitive.attributes.find("TEXCOORD_0") != primitive.attributes.end();
                 const tinygltf::Accessor* texCoordAccessor = nullptr;
@@ -547,6 +574,14 @@ private:
                     }
                     else {
                         vertex.texCoord = { 0.0f, 0.0f };
+                    }
+
+                    if (hasNormals) {
+                        const float* normal = reinterpret_cast<const float*>(&normalBuffer->data[normalBufferView->byteOffset + normalAccessor->byteOffset + i * 12]);
+                        vertex.normal = glm::normalize(glm::vec3(normal[0], -normal[1], normal[2]));
+                    }
+                    else {
+                        vertex.normal = glm::normalize(vertex.pos);
                     }
 
                     vertex.color = { 1.0f, 1.0f, 1.0f };
@@ -967,6 +1002,7 @@ private:
     }
 
     // Update a UBO
+    // This is what you're gonna modify when you want to change what gets sent to the shader!!!
     void updateUniformBuffer(uint32_t currentImage) {
         // Calculate time since rendering has started
         static auto startTime = std::chrono::high_resolution_clock::now();
@@ -976,7 +1012,7 @@ private:
         UniformBufferObject ubo{};
         ubo.model = glm::rotate(
             glm::mat4(1.0f), 
-            time * glm::radians(90.0f), 
+            time * glm::radians(30.0f), 
             glm::vec3(0.0f, 0.0f, 1.0f)
         );
         // Eye position, center position, up axis
@@ -994,13 +1030,15 @@ private:
         );
         // Compensate for the OpenGL legacy issue in GLM where Y is inverted
         ubo.proj[1][1] *= -1;
+        // The light
+        ubo.light = ubo.model * light.position;
         // Copy buffer
         memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
 
     // Create UBO stuff
     void createDescriptorSetLayout() {
-        // Create layout bining for UBO in graphics pipeline
+        // Create layout binding for UBO in graphics pipeline
         VkDescriptorSetLayoutBinding uboLayoutBinding{};
         uboLayoutBinding.binding = 0;
         uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
